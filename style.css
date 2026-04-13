@@ -5,6 +5,18 @@
     box-sizing: border-box;
 }
 
+html {
+    /* 隐藏根滚动条，保留页面滚动能力，兼容主流浏览器及 IE/旧版 Edge */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+html::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+}
+
 body {
     font-family: Arial, sans-serif;
     background-color: #f0f0f0;
