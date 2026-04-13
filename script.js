@@ -66,7 +66,7 @@ async function fetchImages() {
         allImageUrls.sort(() => Math.random() - 0.5);
 
         initColumns(); // 初始化分列
-        
+
         // 初次只加载部分 DOM
         loadMoreImages();
 
@@ -90,7 +90,7 @@ function loadMoreImages() {
 
     for (let i = currentIndex; i < endIndex; i++) {
         const url = allImageUrls[i];
-        
+
         const imgDiv = document.createElement('div');
         imgDiv.classList.add('image-item');
 
@@ -99,15 +99,18 @@ function loadMoreImages() {
         img.alt = 'Image';
 
         imgDiv.appendChild(img);
-        
+
         imageElements.push(imgDiv);
-        
+
         // 轮询：将图片依次添加到不同的列中（1, 2, 3, 4, 1, 2, 3, 4...）
         // 实现真正的“从左到右、从上往下”加载效果，杜绝右侧空白或闪屏
         columns[i % colNum].appendChild(imgDiv);
 
         // 为每个图片绑定懒加载观察器
         lazyLoadImage(img);
+
+        // 为每个图片绑定 Lightbox 点击事件
+        attachLightboxListener(img);
     }
 
     currentIndex = endIndex;
@@ -137,7 +140,7 @@ function lazyLoadImage(img) {
             if (entry.isIntersecting) {
                 const targetImg = entry.target;
                 targetImg.src = targetImg.getAttribute('data-src'); // 替换成真实图片链接
-                
+
                 // 图片加载完成后加上渐显效果
                 targetImg.onload = () => {
                     targetImg.style.opacity = 1;
@@ -148,7 +151,7 @@ function lazyLoadImage(img) {
         });
     }, {
         rootMargin: '1000px', // 提前1000px开始加载真实图片资源，确保进入视口前已经加载完毕
-        threshold: 0.1 
+        threshold: 0.1
     });
 
     observer.observe(img);
@@ -156,3 +159,86 @@ function lazyLoadImage(img) {
 
 // 调用函数来获取并显示图片
 fetchImages();
+
+// ========== Lightbox 功能 ==========
+
+const lightbox = document.getElementById('lightbox');
+const lightboxImage = document.getElementById('lightbox-image');
+const lightboxOverlay = document.querySelector('.lightbox-overlay');
+const copyLinkBtn = document.getElementById('copy-link-btn');
+const downloadBtn = document.getElementById('download-btn');
+
+let currentImageUrl = ''; // 存储当前查看的图片URL
+
+// 为所有图片添加点击事件，打开 Lightbox
+function attachLightboxListener(img) {
+    img.addEventListener('click', function () {
+        const imageUrl = this.getAttribute('data-src') || this.src;
+        openLightbox(imageUrl);
+    });
+
+    // 添加鼠标指针变化
+    img.style.cursor = 'pointer';
+}
+
+// 打开 Lightbox
+function openLightbox(imageUrl) {
+    currentImageUrl = imageUrl;
+    lightboxImage.src = imageUrl;
+    lightbox.classList.add('active');
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+}
+
+// 关闭 Lightbox
+function closeLightbox() {
+    lightbox.classList.remove('active');
+    document.body.style.overflow = 'auto'; // 恢复背景滚动
+}
+
+// 点击遮罩层关闭 Lightbox
+lightboxOverlay.addEventListener('click', closeLightbox);
+
+// 按 ESC 键关闭 Lightbox
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        closeLightbox();
+    }
+});
+
+// 复制链接功能
+copyLinkBtn.addEventListener('click', function () {
+    if (!currentImageUrl) return;
+
+    navigator.clipboard.writeText(currentImageUrl).then(() => {
+        // 显示反馈
+        const originalText = copyLinkBtn.textContent;
+        copyLinkBtn.textContent = '✓ 已复制！';
+        copyLinkBtn.style.pointerEvents = 'none';
+
+        setTimeout(() => {
+            copyLinkBtn.textContent = originalText;
+            copyLinkBtn.style.pointerEvents = 'auto';
+        }, 2000);
+    }).catch(() => {
+        alert('复制失败，请重试');
+    });
+});
+
+// 下载原图功能
+downloadBtn.addEventListener('click', function () {
+    if (!currentImageUrl) return;
+
+    // 创建一个临时的 a 标签用于下载
+    const link = document.createElement('a');
+    link.href = currentImageUrl;
+    link.download = `image-${Date.now()}.jpg`; // 使用时间戳作为文件名
+
+    // 处理跨域问题：如果直接下载失败，则在新标签页打开
+    link.addEventListener('error', () => {
+        window.open(currentImageUrl, '_blank');
+    });
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+});
