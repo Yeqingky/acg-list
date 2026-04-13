@@ -94,12 +94,15 @@ function loadMoreImages() {
         const imgDiv = document.createElement('div');
         imgDiv.classList.add('image-item');
 
+        const glow = document.createElement('div');
+        glow.classList.add('image-glow');
+
         const img = document.createElement('img');
         img.setAttribute('data-src', url);
         img.alt = 'Image';
 
+        imgDiv.appendChild(glow);
         imgDiv.appendChild(img);
-
         imageElements.push(imgDiv);
 
         // 轮询：将图片依次添加到不同的列中（1, 2, 3, 4, 1, 2, 3, 4...）
@@ -111,6 +114,9 @@ function loadMoreImages() {
 
         // 为每个图片绑定 Lightbox 点击事件
         attachLightboxListener(img);
+
+        // 为每个图片绑定鼠标光效
+        attachImageGlowEffect(imgDiv, glow);
     }
 
     currentIndex = endIndex;
@@ -181,6 +187,100 @@ function attachLightboxListener(img) {
     img.style.cursor = 'pointer';
 }
 
+// 为图片卡片绑定鼠标跟随光效
+function attachImageGlowEffect(card, glow) {
+    if (!card || !glow) return;
+
+    card.addEventListener('mousemove', function (event) {
+        const rect = card.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        glow.style.left = `${x}px`;
+        glow.style.top = `${y}px`;
+    });
+
+    card.addEventListener('mouseleave', function () {
+        glow.style.left = '50%';
+        glow.style.top = '50%';
+    });
+}
+
+// 统一处理复制图片链接
+function copyImageUrl(imageUrl, button) {
+    if (!imageUrl) return;
+
+    copyTextToClipboard(imageUrl).then(() => {
+        if (button) {
+            showButtonFeedback(button, '✓ 已复制！');
+        }
+    }).catch(() => {
+        alert('复制失败，请重试');
+    });
+}
+
+// 统一处理下载图片
+function downloadImage(imageUrl) {
+    if (!imageUrl) return;
+
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = `image-${Date.now()}.jpg`;
+    link.target = '_blank';
+    link.rel = 'noopener';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// 统一处理按钮反馈文案
+function showButtonFeedback(button, feedbackText) {
+    const originalText = button.getAttribute('data-original-text') || button.textContent;
+    button.setAttribute('data-original-text', originalText);
+    button.textContent = feedbackText;
+    button.disabled = true;
+
+    setTimeout(() => {
+        button.textContent = originalText;
+        button.disabled = false;
+    }, 2000);
+}
+
+// 复制文本，优先使用现代 API，失败时回退到传统方案
+function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+    }
+
+    return new Promise((resolve, reject) => {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', 'readonly');
+        textarea.style.position = 'fixed';
+        textarea.style.top = '-9999px';
+        textarea.style.left = '-9999px';
+
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+
+        try {
+            const copied = document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            if (copied) {
+                resolve();
+            } else {
+                reject();
+            }
+        } catch (error) {
+            document.body.removeChild(textarea);
+            reject(error);
+        }
+    });
+}
+
 // 打开 Lightbox
 function openLightbox(imageUrl) {
     currentImageUrl = imageUrl;
@@ -207,38 +307,10 @@ document.addEventListener('keydown', function (e) {
 
 // 复制链接功能
 copyLinkBtn.addEventListener('click', function () {
-    if (!currentImageUrl) return;
-
-    navigator.clipboard.writeText(currentImageUrl).then(() => {
-        // 显示反馈
-        const originalText = copyLinkBtn.textContent;
-        copyLinkBtn.textContent = '✓ 已复制！';
-        copyLinkBtn.style.pointerEvents = 'none';
-
-        setTimeout(() => {
-            copyLinkBtn.textContent = originalText;
-            copyLinkBtn.style.pointerEvents = 'auto';
-        }, 2000);
-    }).catch(() => {
-        alert('复制失败，请重试');
-    });
+    copyImageUrl(currentImageUrl, copyLinkBtn);
 });
 
 // 下载原图功能
 downloadBtn.addEventListener('click', function () {
-    if (!currentImageUrl) return;
-
-    // 创建一个临时的 a 标签用于下载
-    const link = document.createElement('a');
-    link.href = currentImageUrl;
-    link.download = `image-${Date.now()}.jpg`; // 使用时间戳作为文件名
-
-    // 处理跨域问题：如果直接下载失败，则在新标签页打开
-    link.addEventListener('error', () => {
-        window.open(currentImageUrl, '_blank');
-    });
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadImage(currentImageUrl);
 });
